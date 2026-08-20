@@ -1,0 +1,21 @@
+﻿{
+  "name": "FestOS",
+  "short_name": "FestOS",
+  "description": "Festival Management Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDF8E2",
+  "theme_color": "#504E76",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

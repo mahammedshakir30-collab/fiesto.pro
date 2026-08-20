@@ -1,0 +1,1102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GlobalRole {
+  SUPER_ADMIN
+  ORGANIZER
+  VENDOR
+  ATTENDEE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum ImportEntity {
+  CANDIDATE
+  VENDOR
+  STAFF
+  REGISTRATION
+  PROGRAMME
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id                  String     @id @default(cuid())
+  email               String     @unique
+  emailVerified       DateTime?
+  password            String?
+  name                String? // For NextAuth/Google
+  firstName           String?
+  lastName            String?
+  role                GlobalRole @default(ATTENDEE)
+  avatarUrl           String?
+  image               String? // For NextAuth/Google
+  securityStamp       String     @default(uuid())
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  accounts         Account[]
+  sessions         Session[]
+  organizerProfile Organizer?
+  orders           Order[]
+  attendees        Attendee[]
+  vendors          Vendor[]
+  staffProfiles    StaffMember[]
+  userRoles        UserRole[]
+  notifications    Notification[]
+  staffInvitesSent StaffInvite[]
+    platformUser     PlatformUser?
+    teamsLed         Team[]         @relation("TeamLeader")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
+}
+
+// ==========================================
+// PLATFORM LEVEL (SUPER ADMIN)
+// ==========================================
+
+enum PlatformRole {
+  SUPER_ADMIN
+  SUPPORT_AGENT
+}
+
+model PlatformUser {
+  id        String       @id @default(cuid())
+  userId    String       @unique
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      PlatformRole
+  createdAt DateTime     @default(now())
+}
+
+model PlanTier {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  monthlyPrice     Float
+  annualPrice      Float?
+  featureEntitlements Json
+  maxFestivals     Int?
+  maxStaffPerFestival Int?
+  active           Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  tagline          String?
+  badge            String?
+  durationOptions  Json     @default("[]")
+  featureList      Json     @default("[]")
+  isContactSales   Boolean  @default(false)
+  
+  festivals        Festival[]
+  subscriptions    Subscription[]
+}
+
+model PlatformAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String   // PlatformUser.id
+  action     String   // e.g. "festival.suspend", "plan.update", "flag.toggle"
+  targetType String   // "festival" | "plan" | "user"
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model GlobalFeatureFlag {
+  key         String   @id
+  description String?
+  enabled     Boolean  @default(false)
+  rolloutPct  Int?
+}
+
+model PlatformSettings {
+  id                 String @id @default("singleton")
+  platformName       String @default("FestOS")
+  supportEmail       String @default("support@festos.app")
+  defaultTrialDays   Int    @default(14)
+  termsOfServiceUrl  String?
+  privacyPolicyUrl   String?
+}
+
+// ==========================================
+// TENANT LEVEL (FESTIVAL)
+// ==========================================
+
+enum FestivalStatus {
+  DRAFT
+  PUBLISHED
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Festival {
+  id                     String         @id @default(cuid())
+  name                   String
+  slug                   String         @unique
+  description            String
+  location               String
+  startDate              DateTime
+  endDate                DateTime
+  status                 FestivalStatus
+  coverImageUrl          String?
+  competitionModeEnabled Boolean        @default(false)
+  chestNumberAutoGenerate Boolean       @default(false)
+  vendorLeaderboardEnabled Boolean      @default(false)
+  vendorLeaderboardShowValues Boolean   @default(false)
+  
+  planTierId             String?
+  planTier               PlanTier?      @relation(fields: [planTierId], references: [id])
+  trialEndsAt            DateTime?
+  suspended              Boolean        @default(false)
+  suspendedReason        String?
+
+  createdAt              DateTime       @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  coOrganizers     FestivalOrganizer[]
+  ticketTiers      TicketTier[]
+  orders           Order[]
+  attendees        Attendee[]
+  stages           Stage[]
+  lineupSlots      LineupSlot[]
+  vendors          Vendor[]
+  staffMembers     StaffMember[]
+  announcements    Announcement[]
+  roles            Role[]
+  onboardingSteps  OnboardingStep[]
+  categories       Category[]
+  programmes       Programme[]
+  teams            Team[]
+  candidates       Candidate[]
+  chestNumberRules ChestNumberRule[]
+  positionCriteria PositionCriteria[]
+  gradeCriteria    GradeCriteria[]
+  staffInvites     StaffInvite[]
+  pointAdjustments PointAdjustment[]
+  topperTemplates  TopperTemplate[]
+  templates         Template[]
+  importJobs       ImportJob[]
+  siteSettings     SiteSettings?
+  sitePages        SitePage[]
+  siteAnalyticsEvents SiteAnalyticsEvent[]
+  subscription     Subscription?
+  invoices         Invoice[]
+  standingsPublishState StandingsPublishState?
+}
+
+model Organizer {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  companyName  String
+  contactEmail String
+  contactPhone String?
+  website      String?
+  stripeConnectAccountId String?
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  festivals FestivalOrganizer[]
+}
+
+// Join model for Festival <-> Organizer to support co-organizers
+model FestivalOrganizer {
+  festivalId  String
+  organizerId String
+  isOwner     Boolean  @default(false) // Distinguishes the primary owner from co-organizers
+  createdAt   DateTime @default(now())
+
+  festival  Festival  @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  organizer Organizer @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+
+  @@id([festivalId, organizerId])
+}
+
+enum TicketStatus {
+  ACTIVE
+  SOLD_OUT
+  HIDDEN
+}
+
+model TicketTier {
+  id          String       @id @default(cuid())
+  festivalId  String
+  name        String
+  description String?
+  price       Int // stored in cents
+  currency    String
+  capacity    Int
+  soldCount   Int          @default(0)
+  status      TicketStatus
+  createdAt   DateTime     @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival  Festival   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  attendees Attendee[]
+  @@index([festivalId])
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  festivalId  String
+  userId      String
+  totalAmount Int // stored in cents
+  currency    String
+  status      OrderStatus
+  purchasedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival  Festival   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attendees Attendee[] // 1 Order can have multiple Attendees/Tickets
+  @@index([festivalId])
+}
+
+model Attendee {
+  id           String    @id @default(cuid())
+  orderId      String
+  userId       String
+  festivalId   String
+  ticketTierId String
+  qrCode       String    @unique
+  checkedIn    Boolean   @default(false)
+  checkedInAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  festival   Festival   @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  ticketTier TicketTier @relation(fields: [ticketTierId], references: [id], onDelete: Cascade)
+  @@index([festivalId])
+}
+
+model Artist {
+  id           String   @id @default(cuid())
+  name         String
+  bio          String?
+  genre        String[]
+  spotifyUrl   String?
+  instagramUrl String?
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  lineupSlots LineupSlot[]
+}
+
+model Stage {
+  id         String   @id @default(cuid())
+  festivalId String
+  name       String
+  capacity   Int?
+  indoor     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival    Festival     @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  lineupSlots LineupSlot[]
+  @@index([festivalId])
+}
+
+model LineupSlot {
+  id         String   @id @default(cuid())
+  festivalId String
+  stageId    String
+  artistId   String
+  startTime  DateTime
+  endTime    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  stage    Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  artist   Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  @@index([festivalId])
+}
+
+enum VendorCategory {
+  FOOD
+  MERCH
+  BEVERAGE
+  EXPERIENCE
+  OTHER
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+}
+
+model Vendor {
+  id          String         @id @default(cuid())
+  festivalId  String
+  userId      String
+  name        String
+  description String
+  category    VendorCategory
+  status      VendorStatus
+  boothNumber String?
+  createdAt   DateTime       @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile  VendorProfile?
+  payouts  VendorPayout[]
+  leaderboardSnapshots VendorLeaderboardSnapshot[]
+  @@index([festivalId])
+}
+
+model VendorProfile {
+  id            String   @id @default(cuid())
+  vendorId      String   @unique
+  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  businessName  String
+  description   String?
+  logoUrl       String?
+  boothPhotos   Json     // array of image URLs
+  category      String?  // e.g. "Food", "Crafts", "Merch"
+  contactEmail  String?
+  contactPhone  String?
+  boothNumber   String?
+}
+
+model VendorPayout {
+  id              String   @id @default(cuid())
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  stripeTransferId String?
+  amount          Float
+  status          String   // pending | in_transit | paid | failed
+  periodStart     DateTime
+  periodEnd       DateTime
+  paidAt          DateTime?
+}
+
+model VendorLeaderboardSnapshot {
+  id          String   @id @default(cuid())
+  festivalId  String
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  rank        Int
+  metric      String   // "revenue" | "orders" | "rating"
+  value       Float
+  computedAt  DateTime @default(now())
+  @@index([festivalId])
+}
+
+model StaffMember {
+  id         String  @id @default(cuid())
+  festivalId String
+  userId     String
+  active     Boolean @default(true)
+
+  // Explicit Permission Set
+  canScanTickets   Boolean @default(false)
+  canEditLineup    Boolean @default(false)
+  canManageStaff   Boolean @default(false)
+  canManageVendors Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([festivalId])
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+}
+
+model Announcement {
+  id                   String             @id @default(cuid())
+  festivalId           String
+  title                String
+  body                 String
+  status               AnnouncementStatus
+  sendPushNotification Boolean            @default(false)
+  publishedAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  // Relations
+  festival Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  @@index([festivalId])
+}
+
+enum AuthAction {
+  LOGIN_SUCCESS
+  LOGIN_FAIL
+  SIGNUP
+  PASSWORD_RESET
+  VERIFY_RESEND
+}
+
+model AuthLog {
+  id        String     @id @default(cuid())
+  ipAddress String
+  email     String?
+  action    AuthAction
+  createdAt DateTime   @default(now())
+}
+
+enum PanelType {
+  ADMIN
+  FINANCE
+  CHECKIN
+  MARKETING
+  VENDOR_COORDINATOR
+    JUDGE
+    TEAM_LEADER
+}
+
+enum RoleKind {
+  SYSTEM // seeded, non-deletable (e.g. "Owner")
+  CUSTOM // organizer-defined
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  festivalId  String
+  festival    Festival     @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  panelType   PanelType
+  kind        RoleKind     @default(CUSTOM)
+  permissions Permission[] @relation("RolePermissions")
+  userRoles   UserRole[]
+  staffInvites StaffInvite[]
+  createdAt   DateTime     @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  @@unique([festivalId, name])
+}
+
+model Permission {
+  id       String @id @default(cuid())
+  resource String // e.g. "vendor", "ticket", "schedule", "staff", "finance"
+  action   String // e.g. "view", "create", "edit", "delete", "export"
+  roles    Role[] @relation("RolePermissions")
+
+  @@unique([resource, action])
+}
+
+model UserRole {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  festivalId String
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, roleId, festivalId])
+}
+
+model StaffInvite {
+  id         String   @id @default(cuid())
+  festivalId String
+  festival   Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  email      String
+  roleId     String
+  role       Role     @relation(fields: [roleId], references: [id])
+  token      String   @unique
+  inviterId  String
+  inviter    User     @relation(fields: [inviterId], references: [id])
+  status     String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+    teamId     String?
+    team       Team?    @relation(fields: [teamId], references: [id])
+    createdAt  DateTime @default(now())
+  
+  @@unique([festivalId, email])
+}
+
+model OnboardingStep {
+  id          String    @id @default(cuid())
+  festivalId  String
+  festival    Festival  @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  key         String // e.g. "profile", "venues", "tickets", "vendors", "staff", "payouts", "publish"
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  @@unique([festivalId, key])
+}
+
+model SiteSettings {
+  id                   String   @id @default(cuid())
+  festivalId           String   @unique
+  festival             Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  subdomain            String   @unique
+  customDomain         String?  @unique
+  customDomainVerified Boolean  @default(false)
+  passwordProtected    Boolean  @default(false)
+  sitePassword         String?
+  published            Boolean  @default(false)
+  siteMode             String   @default("LIVE")
+  maintenanceMessage   String?
+  noindex              Boolean  @default(false)
+  themeJson            Json
+  homepageBlocks       Json     @default("[]")
+  bannerImageUrl       String?
+  logoUrl              String?
+  galleryEnabled       Boolean  @default(true)
+  downloadsEnabled     Boolean  @default(true)
+  newsEnabled          Boolean  @default(true)
+  resultsLayoutStyle   String   @default("TABLE")
+  resultsShowScores    Boolean  @default(false)
+  standingsPublic      Boolean  @default(true)
+  resultsPublic        Boolean  @default(true)
+  updatedAt            DateTime @default(now()) @updatedAt
+  images               SiteImage[]
+  galleryItems         SiteGalleryItem[]
+  downloads            SiteDownload[]
+  newsPosts            SiteNewsPost[]
+  @@index([festivalId])
+}
+
+model SiteImage {
+  id           String       @id @default(cuid())
+  festivalId   String
+  siteSettings SiteSettings @relation(fields: [festivalId], references: [festivalId], onDelete: Cascade)
+  url          String
+  publicId     String?
+  alt          String       @default("")
+  usedAs       String?
+  fileSize     Int?
+  width        Int?
+  height       Int?
+  createdAt    DateTime     @default(now())
+  @@index([festivalId])
+}
+
+model SiteGalleryItem {
+  id           String       @id @default(cuid())
+  festivalId   String
+  siteSettings SiteSettings @relation(fields: [festivalId], references: [festivalId], onDelete: Cascade)
+  imageUrl     String
+  caption      String?
+  order        Int          @default(0)
+  visible      Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  @@index([festivalId])
+}
+
+model SiteDownload {
+  id           String       @id @default(cuid())
+  festivalId   String
+  siteSettings SiteSettings @relation(fields: [festivalId], references: [festivalId], onDelete: Cascade)
+  title        String
+  description  String?
+  fileUrl      String
+  fileType     String?
+  fileSize     Int?
+  visible      Boolean      @default(true)
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+  @@index([festivalId])
+}
+
+model SiteNewsPost {
+  id            String       @id @default(cuid())
+  festivalId    String
+  siteSettings  SiteSettings @relation(fields: [festivalId], references: [festivalId], onDelete: Cascade)
+  title         String
+  slug          String
+  summary       String?
+  content       String
+  coverImageUrl String?
+  published     Boolean      @default(false)
+  publishedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+  @@unique([festivalId, slug])
+  @@index([festivalId])
+}
+
+model SitePage {
+  id           String   @id @default(cuid())
+  festivalId   String
+  festival     Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  slug         String
+  title        String
+  visible      Boolean  @default(true)
+  navOrder     Int      @default(0)
+  isSystemPage Boolean  @default(false)
+  @@unique([festivalId, slug])
+}
+
+model SiteAnalyticsEvent {
+  id         String   @id @default(cuid())
+  festivalId String
+  festival   Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  path       String
+  referrer   String?
+  createdAt  DateTime @default(now())
+  @@index([festivalId])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ACTION_REQUIRED
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  festivalId String
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       NotificationType @default(INFO)
+  title      String
+  body       String
+  link       String?
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  @@index([festivalId])
+}
+
+model Category {
+  id                 String      @id @default(cuid())
+  festivalId         String
+  festival           Festival    @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name               String
+  candidateMaxPoints Int         @default(0)
+  teamMaxPoints      Int         @default(0)
+  sections           Section[]
+  programmes         Programme[]
+  candidates         Candidate[]
+
+  @@unique([festivalId, name])
+}
+
+model Section {
+  id             String   @id @default(cuid())
+  categoryId     String
+  category       Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  classification String
+  name           String
+}
+
+enum ProgrammeType {
+  INDIVIDUAL
+  GROUP
+}
+
+enum JudgmentMethod {
+  MANUAL_SCORE
+  POSITION_ONLY
+  GRADE_ONLY
+}
+
+model Programme {
+  id               String            @id @default(cuid())
+  festivalId       String
+  festival         Festival          @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  categoryId       String
+  category         Category          @relation(fields: [categoryId], references: [id])
+  name             String
+  code             String
+  type             ProgrammeType     @default(INDIVIDUAL)
+  judgmentMethod   JudgmentMethod    @default(MANUAL_SCORE)
+  venueId          String?
+  scheduledAt      DateTime?
+  status           String            @default("draft")
+  registrations    Registration[]
+  curbs            Curb[]
+  templates        Template[]
+  
+  pointsPublished   Boolean   @default(false)
+  pointsPublishedAt DateTime?
+  teamPointEntries  TeamPointEntry[]
+
+  @@unique([festivalId, code])
+}
+
+model Curb {
+  id                    String    @id @default(cuid())
+  programmeId           String
+  programme             Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  maxEntriesPerTeam     Int?
+  maxEntriesPerCategory Int?
+  maxPointsPerCandidate Int?
+  maxPointsPerTeam      Int?
+}
+
+model Team {
+  id         String      @id @default(cuid())
+  festivalId String
+  festival   Festival    @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name       String
+  candidates Candidate[]
+    leaderId   String?
+    leader     User?      @relation("TeamLeader", fields: [leaderId], references: [id])
+    staffInvites StaffInvite[]
+    @@index([festivalId])
+  teamPointEntries TeamPointEntry[]
+}
+
+model Candidate {
+  id            String         @id @default(cuid())
+  festivalId    String
+  festival      Festival       @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+  teamId        String?
+  team          Team?          @relation(fields: [teamId], references: [id])
+  name          String
+  chestNumber   String?
+  gender        String?
+  photoUrl      String?
+  registrations Registration[]
+  templates     Template[]
+  teamPointEntries TeamPointEntry[]
+
+  @@unique([festivalId, chestNumber])
+  @@index([festivalId, teamId])
+  @@index([teamId])
+}
+
+model Registration {
+  id               String    @id @default(cuid())
+  programmeId      String
+  programme        Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+  candidateId      String
+  candidate        Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  topicTitle       String?
+  substitutedForId String?
+  createdAt        DateTime  @default(now())
+
+  @@unique([programmeId, candidateId])
+  @@index([candidateId])
+  @@index([programmeId])
+}
+
+model ChestNumberRule {
+  id            String   @id @default(cuid())
+  festivalId    String
+  festival      Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  code          String
+  priority      Int      @default(0)
+  teamScope     String   @default("all")
+  categoryScope String   @default("all")
+  prefix        String?
+  startAt       Int      @default(1)
+  @@index([festivalId])
+}
+
+model PositionCriteria {
+  id         String   @id @default(cuid())
+  festivalId String
+  festival   Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name       String
+  positions  Json
+  @@index([festivalId])
+}
+
+model GradeCriteria {
+  id         String   @id @default(cuid())
+  festivalId String
+  festival   Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name       String
+  grades     Json
+  @@index([festivalId])
+}
+
+
+
+
+
+
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  festivalId           String             @unique
+  festival             Festival           @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  planTierId           String
+  planTier             PlanTier           @relation(fields: [planTierId], references: [id])
+  stripeCustomerId     String
+  stripeSubscriptionId String?
+  status               SubscriptionStatus @default(TRIALING)
+  billingInterval      String             @default("monthly")
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  @@index([festivalId])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  festivalId      String
+  festival        Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  stripeInvoiceId String   @unique
+  amountPaid      Float
+  status          String
+  pdfUrl          String?
+  issuedAt        DateTime
+  @@index([festivalId])
+}
+
+model FAQArticle {
+  id         String   @id @default(cuid())
+  category   String   // e.g. "Scoring", "Candidates", "Programmes", "Exports", "Billing"
+  question   String
+  answer     String   // markdown
+  sortOrder  Int      @default(0)
+  published  Boolean  @default(true)
+}
+
+model TutorialVideo {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  youtubeUrl  String
+  category    String?
+  sortOrder   Int      @default(0)
+}
+
+model ReferralCode {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+}
+
+enum ReferralStatus {
+  PENDING     // referred signup happened, not yet converted
+  CONVERTED   // referred festival became a paying customer
+  REWARDED    // credit applied
+}
+
+model Referral {
+  id                 String         @id @default(cuid())
+  referrerUserId     String
+  referredFestivalId String         @unique
+  code               String
+  status             ReferralStatus @default(PENDING)
+  rewardAmount       Float?
+  createdAt          DateTime       @default(now())
+  convertedAt        DateTime?
+  rewardedAt         DateTime?
+}
+
+
+
+
+
+model ImportJob {
+  id           String       @id @default(cuid())
+  festivalId   String
+  festival     Festival     @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  entity       ImportEntity
+  status       ImportStatus @default(PENDING)
+  totalRows    Int          @default(0)
+  successCount Int          @default(0)
+  errorCount   Int          @default(0)
+  fileUrl      String
+  errors       Json?
+  createdAt    DateTime     @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  @@index([festivalId])
+}
+
+
+
+
+enum PosterGenerationMode {
+  AUTO_GENERATED
+  UPLOADED
+}
+
+
+
+model Template {
+  id             String                @id @default(cuid())
+  festivalId     String
+  festival       Festival              @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name           String
+  mode           PosterGenerationMode
+  colorTheme     Json
+  layoutKey      String?
+  sourceImageUrl String?
+  outputImageUrl String
+
+  programmeId      String?
+  programme        Programme?  @relation(fields: [programmeId], references: [id])
+  candidateId      String?
+  candidate        Candidate?  @relation(fields: [candidateId], references: [id])
+  achievementLabel String?
+  headline         String?
+  message          String?
+  published        Boolean     @default(false)
+  featuredOnHome   Boolean     @default(false)
+  publishedAt      DateTime?
+
+  createdAt      DateTime              @default(now())
+  updatedAt            DateTime @default(now()) @updatedAt
+
+  @@index([festivalId])
+}
+
+model TeamPointEntry {
+  id          String     @id @default(cuid())
+  festivalId  String
+  teamId      String
+  team        Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  candidateId String?
+  candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  programmeId String?
+  programme   Programme? @relation(fields: [programmeId], references: [id], onDelete: SetNull)
+  points      Float
+  reason      String
+  awardedBy   String
+  createdAt   DateTime   @default(now())
+
+  @@index([festivalId, candidateId])
+  @@index([festivalId, programmeId])
+}
+
+model StandingsPublishState {
+  id             String    @id @default(cuid())
+  festivalId     String    @unique
+  festival       Festival  @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  published      Boolean   @default(false)
+  publishedAt    DateTime?
+  showCandidates Boolean   @default(true)
+  showReasons    Boolean   @default(false)
+}
+
+enum SetupVideoSource {
+  YOUTUBE
+  UPLOADED
+}
+
+model DashboardSetupVideo {
+  id           String           @id @default(cuid())
+  title        String
+  source       SetupVideoSource
+  youtubeUrl   String?
+  fileUrl      String?
+  thumbnailUrl String?
+  active       Boolean          @default(true)
+  updatedAt            DateTime @default(now()) @updatedAt
+}
+
+
+
+
+
+model PointAdjustment {
+  id          String   @id @default(cuid())
+  festivalId  String
+  festival    Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  candidateId String?
+  teamId      String?
+  delta       Float
+  reason      String
+  createdBy   String
+  createdAt   DateTime @default(now())
+  @@index([festivalId])
+}
+
+model TopperTemplate {
+  id           String   @id @default(cuid())
+  festivalId   String
+  festival     Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  name         String
+  scope        String
+  groupBy      Json
+  compareBy    String   @default("total_points")
+  winnerCount  Int      @default(3)
+  genderFilter String   @default("all")
+  tieBreakers  Json
+  active       Boolean  @default(true)
+  @@index([festivalId])
+}
+
+

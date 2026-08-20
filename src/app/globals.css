@@ -1,0 +1,206 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* EXACT FIESTO Palette */
+    --color-primary: #504E76;
+    --color-accent: #F1642E;
+    --color-success: #A3B565;
+    --color-warning: #FCDD9D;
+    --color-soft: #C4C3E3;
+    --color-base: #FDF8E2;
+
+    /* Light Mode (Public Marketing Site) */
+    --background: var(--color-base);
+    --foreground: #17151F;
+    
+    --card: #FFFFFF;
+    --card-foreground: #17151F;
+    
+    --popover: #FFFFFF;
+    --popover-foreground: #17151F;
+    
+    --primary: var(--color-primary);
+    --primary-foreground: #FFFFFF;
+    
+    --secondary: var(--color-soft);
+    --secondary-foreground: var(--color-primary);
+    
+    --muted: #F2EEDD;
+    --muted-foreground: #737373;
+    
+    --accent: var(--color-accent);
+    --accent-foreground: #FFFFFF;
+    
+    --destructive: #ef4444;
+    --destructive-foreground: #FFFFFF;
+
+    --border: #E6E1D4;
+    --input: #E6E1D4;
+    --ring: var(--color-primary);
+    
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* EXACT FIESTO Palette */
+    --color-primary: #504E76;
+    --color-accent: #F1642E;
+    --color-success: #A3B565;
+    --color-warning: #FCDD9D;
+    --color-soft: #C4C3E3;
+    --color-base: #FDF8E2;
+
+    /* Dark Mode (Admin/Organizer Dashboards) */
+    --background: #17151F;
+    --foreground: var(--color-base);
+    
+    --card: #201D2C;
+    --card-foreground: var(--color-base);
+    
+    --popover: #201D2C;
+    --popover-foreground: var(--color-base);
+    
+    --primary: var(--color-accent);
+    --primary-foreground: #FFFFFF;
+    
+    --secondary: var(--color-primary);
+    --secondary-foreground: #FFFFFF;
+    
+    --muted: #2A273A;
+    --muted-foreground: #A19FAF;
+    
+    --accent: var(--color-accent);
+    --accent-foreground: #FFFFFF;
+    
+    --destructive: #ef4444;
+    --destructive-foreground: #FFFFFF;
+
+    --border: #353247;
+    --input: #353247;
+    --ring: var(--color-accent);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased selection:bg-color-soft selection:text-color-primary;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+/* Custom Utilities for Premium Elevation & Transitions */
+@layer utilities {
+  .shadow-soft {
+    box-shadow: 0 4px 20px -2px rgba(80, 78, 118, 0.04), 0 1px 4px -1px rgba(80, 78, 118, 0.02);
+  }
+  .shadow-soft-lg {
+    box-shadow: 0 12px 30px -4px rgba(80, 78, 118, 0.06), 0 4px 10px -2px rgba(80, 78, 118, 0.03);
+  }
+  
+  .transition-soft {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    transition-duration: 250ms;
+  }
+  
+  /* Modern scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+    opacity: 0.3;
+  }
+}
+
+/* --- Responsive tables ------------------------------------ */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-container table {
+  min-width: 600px;
+}
+
+/* --- Touch targets ---------------------------------------- */
+@media (max-width: 768px) {
+  button, [role="button"], a {
+    min-height: 40px;
+  }
+  .btn-sm {
+    min-height: 36px;
+  }
+}
+
+/* --- Smooth scroll ---------------------------------------- */
+html {
+  scroll-behavior: smooth;
+}
+
+/* --- Content width clamp --------------------------------- */
+.content-safe {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* --- Stat card grids responsive --------------------------- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Sidebar animations ----------------------------------- */
+@keyframes slide-in-from-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes slide-in-from-top-2 {
+  from { transform: translateY(-8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-in.slide-in-from-left {
+  animation: slide-in-from-left 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-in.slide-in-from-top-2 {
+  animation: slide-in-from-top-2 150ms ease-out;
+}
+
+/* Hardware acceleration for common animations */
+.transition-transform {
+  will-change: transform;
+}
+.transition-opacity {
+  will-change: opacity;
+}
+.animate-in, .animate-out {
+  will-change: transform, opacity;
+}

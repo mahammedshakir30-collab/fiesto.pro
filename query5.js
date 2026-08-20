@@ -1,0 +1,1 @@
+const { PrismaClient } = require(" \@prisma/client\\); const prisma = new PrismaClient(); async function main() { const jobs = await prisma.importJob.findMany({ orderBy: { createdAt: \\desc\\ }, take: 1, include: { errors: true } }); console.log(JSON.stringify(jobs[0], null, 2)); } main().finally(() => prisma.$disconnect());
